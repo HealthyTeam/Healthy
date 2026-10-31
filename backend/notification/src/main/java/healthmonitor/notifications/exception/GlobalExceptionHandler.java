@@ -25,12 +25,12 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
                 HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                "You do not have permission to access this resource",
+                "Error while processing this action",
                 request.getRequestURI()
         );
 
         return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
+                .status(HttpStatus.BAD_REQUEST)
                 .body(errorResponse);
     }
 
@@ -65,7 +65,7 @@ public class GlobalExceptionHandler {
                 .body(errorResponse);
     }
 
-    @ExceptionHandler({Exception.class, NotificationServiceInternalError.class})
+    @ExceptionHandler({Exception.class})
     public ResponseEntity<ErrorResponse> handleGlobalException(
             Exception ex, HttpServletRequest request) {
 
