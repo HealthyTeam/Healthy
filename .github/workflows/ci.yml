@@ -171,7 +171,55 @@ jobs:
           retention-days: 30
 
   # ==========================================
-  # 5. Budowanie i publikacja obrazów Docker (GHCR)
+  # 5. Weryfikacja działania aplikacji (Health Check)
+  # ==========================================
+  health-check:
+    name: Health Check
+    needs: [ build-backend-java, build-backend-python, build-frontend-web ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Downloading code from a repository
+        uses: actions/checkout@v4
+
+      - name: JDK 21 configuration
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Package JARs without running tests
+        working-directory: ./backend
+        run: mvn package -DskipTests
+
+      - name: Start selected services and wait for Docker Healthchecks
+        env:
+          # Ograniczenie pamięci RAM dla pojedynczego kontenera Java do 256MB,
+          # aby maszyna GitHub Actions (7GB RAM) nie uległa przeciążeniu:
+          JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+        run: |
+          # Flaga --wait sprawia, że Docker Compose sam czeka, aż wszystkie
+          # zdefiniowane w pliku "healthcheck:" zwrócą status "healthy"!
+          docker compose -f backend/containers/docker-compose.yml up -d --build \
+            --wait --wait-timeout 300 \
+            gateway auth patients ai-worker medical-staff vital-signs
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== STATUS KONTENERÓW ==="
+          docker compose -f backend/containers/docker-compose.yml ps -a
+          echo "=== LOGI Z KONTENERÓW ==="
+          docker compose -f backend/containers/docker-compose.yml logs --tail=100
+
+      - name: Stop and remove containers
+        if: always()
+        run: |
+          docker compose -f backend/containers/docker-compose.yml down -v
+
+  # ==========================================
+  # 6. Budowanie i publikacja obrazów Docker (GHCR)
   # ==========================================
   build-and-push-docker:
     name: Build & Push Docker Images
