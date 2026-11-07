@@ -203,7 +203,32 @@ jobs:
           # zdefiniowane w pliku "healthcheck:" zwrócą status "healthy"!
           docker compose -f backend/containers/docker-compose.yml up -d --build \
             --wait --wait-timeout 300 \
-            gateway auth patients ai-worker medical-staff vital-signs
+            gateway auth patients ai-worker medical-staff vital-signs loki promtail
+
+      - name: Observability Check (Metrics & Centralized Logging)
+        run: |
+          echo "=== 1. Weryfikacja dostępności endpointu metryk (Spring Boot Actuator) ==="
+          # Sprawdzamy czy endpoint metryk i Prometheusa odpowiada kodem 200
+          curl -s -f http://localhost:8080/actuator/metrics > /dev/null
+          echo "Endpoint /actuator/metrics w API Gateway jest dostępny!"
+
+          if curl -s -f http://localhost:8080/actuator/prometheus > /dev/null; then
+            echo "Endpoint /actuator/prometheus jest dostępny i gotowy!"
+          fi
+
+          echo "=== 2. Sprawdzenie, czy logi trafiają do centralnego systemu (Grafana Loki) ==="
+          # Czekamy chwilę, aż Promtail prześle pierwsze logi z kontenerów do Lokiego
+          sleep 5
+          LOKI_LABELS=$(curl -s http://localhost:3100/loki/api/v1/labels)
+          echo "Odpowiedź z API Loki (/loki/api/v1/labels): $LOKI_LABELS"
+
+          # Weryfikujemy, czy Loki zarejestrował jakiekolwiek strumienie logów (status success i niepusta lista)
+          if echo "$LOKI_LABELS" | grep -q '"status":"success"'; then
+            echo "✅ Centralny system logowania (Loki) działa i odbiera metadane z Promtail!"
+          else
+            echo "❌ BŁĄD: Brak danych w systemie Loki!"
+            exit 1
+          fi
 
       - name: Show logs on failure
         if: failure()
