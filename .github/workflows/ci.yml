@@ -203,7 +203,7 @@ jobs:
           # zdefiniowane w pliku "healthcheck:" zwrócą status "healthy"!
           docker compose -f backend/containers/docker-compose.yml up -d --build \
             --wait --wait-timeout 300 \
-            gateway auth patients ai-worker medical-staff vital-signs loki promtail
+            gateway auth patients medical-staff vital-signs loki promtail
 
       - name: Observability Check (Metrics & Centralized Logging)
         run: |
